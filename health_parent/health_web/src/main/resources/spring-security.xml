@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                  http://www.springframework.org/schema/beans/spring-beans.xsd
+                  http://www.springframework.org/schema/mvc
+                  http://www.springframework.org/schema/mvc/spring-mvc.xsd
+                  http://code.alibabatech.com/schema/dubbo
+                  http://code.alibabatech.com/schema/dubbo/dubbo.xsd
+                  http://www.springframework.org/schema/context
+                  http://www.springframework.org/schema/context/spring-context.xsd
+                  http://www.springframework.org/schema/security
+                  http://www.springframework.org/schema/security/spring-security.xsd">
+
+    <!--开启对类的权限控制，对@PreAuthorize注解的支持-->
+    <security:global-method-security pre-post-annotations="enabled"></security:global-method-security>
+    <!--1：定义哪些链接可以放行
+            * 例如：静态资源需要放行
+        security:http
+            * security="none"：没有权限
+            * pattern="/login.html"：访问的URL地址
+    -->
+    <security:http security="none" pattern="/login.html"></security:http>
+    <security:http security="none" pattern="/js/**"></security:http>
+    <security:http security="none" pattern="/css/**"></security:http>
+    <security:http security="none" pattern="/img/**"></security:http>
+    <security:http security="none" pattern="/plugins/**"></security:http>
+
+    <!--2：定义哪些链接不可以放行，即需要有角色、权限才可以放行
+        security:http：定义哪些链接不可以放行
+            * auto-config="true"：自动配置，如果是true，表示SpringSecurity底层会为登录（认证）操作提供登录页面，包括登录功能和退出功能
+                                    如果是false，必须手动提供登录页面，并设置登录信息，才能完成登录
+            * use-expressions="true"：是否使用表达式控制角色和权限，true使用表达式
+                                     如果是true：access="hasRole('ROLE_ADMIN')"
+                                    如果是flase：access="ROLE_ADMIN"
+        security:intercept-url：定义需要某些角色或权限才能访问的url
+            * pattern="/**"：表示系统中的所有url，都需要‘ROLE_ADMIN’的角色才能访问
+            * pattern="/a.html"：表示系统中/a.html，都需要‘ROLE_ADMIN’的角色才能访问
+            * access="hasRole('ROLE_ADMIN')"：hasRole就是表达式的使用方式，具有ROLE_ADMIN的角色就可以进行访问
+            * access="hasAuthority('add_checkitem')"：hasAuthority表示具有add_checkitem的权限就可以进行访问
+            * access="isAuthenticated()"：表示只要认证通过，就可以访问系统的功能
+
+    -->
+    <security:http auto-config="true" use-expressions="true">
+        <!--因为SpringSecurity默认对iframe标签、frame加载的页面是无权访问，需要放开权限
+            policy="DENY"：默认值，表示无权访问
+            policy="SAMEORIGIN"：表示同域名下可以访问
+            policy="ALLOW-FROM"：表示运行跨域名访问
+        -->
+        <security:headers>
+            <security:frame-options policy="SAMEORIGIN"></security:frame-options>
+        </security:headers>
+
+        <!--测试配置多种校验规则，完成对访问的页面做权限控制-->
+        <security:intercept-url pattern="/pages/**" access="isAuthenticated()"></security:intercept-url>
+
+
+        <!--配置登录信息
+            login-page="/login.html"：指定登录页面
+            username-parameter="username"：指定登录页面中的username表单名称（默认值username）
+            password-parameter="password"：指定登录页面中的password表单名称（默认值password）
+            login-processing-url="/login.do"：指定登录访问的url地址（默认值是/login）
+            default-target-url="/index.html"：指定认证成功之后，跳转的页面/index.html
+            authentication-failure-url="/login.html"：指定认证失败之后，跳转的页面/login.html
+            always-use-default-target="true"：不管从哪个页面跳转到登录页面，一直默认使用目标的url（/index.html）作为成功页面
+        -->
+        <security:form-login login-page="/login.html"
+                             username-parameter="username"
+                             password-parameter="password"
+                             login-processing-url="/login.do"
+                             default-target-url="/pages/main.html"
+                             authentication-failure-url="/login.html"
+                             always-use-default-target="true"></security:form-login>
+
+        <!--配置退出登录信息
+            * logout-url=""：退出的url
+            * logout-success-url=""：退出成功后的跳转页面
+            * invalidate-session="true"：清理Session
+        -->
+        <security:logout logout-url="/logout.do" logout-success-url="/login.html" invalidate-session="true"></security:logout>
+
+        <!--SpringSecurity默认开启csrf的跨域伪造，如果开启，默认没有权限，报错403。所以关闭跨域伪造-->
+        <security:csrf disabled="true"></security:csrf>
+    </security:http>
+
+    <!--3：认证管理，定义登录账号名和密码，并授予访问的角色、权限-->
+    <!--从数据库查询
+    当springSecurity进行认证和授权的时候，一定会执行UserService中的内容
+    -->
+    <security:authentication-manager>
+        <security:authentication-provider user-service-ref="springSecurityUserService">
+            <!--完成匹配，matches让SpringSecurity自动完成-->
+            <security:password-encoder ref="bCryptPasswordEncoder"></security:password-encoder>
+        </security:authentication-provider>
+    </security:authentication-manager>
+
+    <!--使用SpringSecurity提供的BCryptPasswordEncoder-->
+    <bean id="bCryptPasswordEncoder" class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder"></bean>
+
+</beans>
